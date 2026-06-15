@@ -1,0 +1,133 @@
+@page "/profile"
+@inject IUserClientService UserService
+@inject AuthenticationStateProvider AuthStateProvider
+@attribute [Authorize]
+
+<div class="page-header">
+    <h1 class="page-title">My Profile</h1>
+    <p class="page-subtitle">View and update your account information.</p>
+</div>
+
+@if (!string.IsNullOrEmpty(message))
+{
+    <div class="alert @(isError ? "alert-error" : "alert-success")">@message</div>
+}
+
+@if (loading)
+{
+    <div class="loading"><div class="spinner"></div> Loading...</div>
+}
+else if (user is not null)
+{
+    <div style="display:grid;grid-template-columns:1fr 1fr;gap:24px;max-width:900px;">
+
+        <!-- Info card -->
+        <div class="card" style="padding:28px;">
+            <div style="display:flex;align-items:center;gap:16px;margin-bottom:24px;">
+                <div style="width:64px;height:64px;border-radius:50%;background:var(--accent);display:flex;align-items:center;justify-content:center;font-size:26px;font-weight:700;color:#fff;flex-shrink:0;">
+                    @user.FirstName.FirstOrDefault()
+                </div>
+                <div>
+                    <div style="font-size:20px;font-weight:700;">@user.FullName</div>
+                    <div style="font-size:13px;color:var(--text-muted);">@user.Email</div>
+                    <span class="badge category" style="margin-top:4px;display:inline-block;">@user.Role</span>
+                </div>
+            </div>
+            <div style="display:flex;flex-direction:column;gap:12px;">
+                <div style="display:flex;justify-content:space-between;padding:10px 0;border-bottom:1px solid var(--border);">
+                    <span style="color:var(--text-muted);font-size:13px;">Phone</span>
+                    <span style="font-size:14px;">@(string.IsNullOrWhiteSpace(user.PhoneNumber) ? "—" : user.PhoneNumber)</span>
+                </div>
+                <div style="display:flex;justify-content:space-between;padding:10px 0;border-bottom:1px solid var(--border);">
+                    <span style="color:var(--text-muted);font-size:13px;">Driver's License</span>
+                    <span style="font-size:14px;">@(string.IsNullOrWhiteSpace(user.DriverLicenseNumber) ? "—" : user.DriverLicenseNumber)</span>
+                </div>
+                <div style="display:flex;justify-content:space-between;padding:10px 0;border-bottom:1px solid var(--border);">
+                    <span style="color:var(--text-muted);font-size:13px;">Member since</span>
+                    <span style="font-size:14px;">@user.CreatedAt.ToString("MMMM dd, yyyy")</span>
+                </div>
+                <div style="display:flex;justify-content:space-between;padding:10px 0;">
+                    <span style="color:var(--text-muted);font-size:13px;">Status</span>
+                    <span class="badge @(user.IsActive ? "available" : "unavailable")">@(user.IsActive ? "Active" : "Inactive")</span>
+                </div>
+            </div>
+        </div>
+
+        <!-- Edit form card -->
+        <div class="card" style="padding:28px;">
+            <h3 style="margin:0 0 20px;font-size:16px;font-weight:600;">Edit Information</h3>
+            <div class="form-group">
+                <label class="form-label">First Name</label>
+                <input @bind="firstName" class="form-control" placeholder="First name" />
+            </div>
+            <div class="form-group">
+                <label class="form-label">Last Name</label>
+                <input @bind="lastName" class="form-control" placeholder="Last name" />
+            </div>
+            <div class="form-group">
+                <label class="form-label">Phone</label>
+                <input @bind="phone" class="form-control" placeholder="+389 70 000 000" />
+            </div>
+            <div class="form-group">
+                <label class="form-label">Driver's License</label>
+                <input @bind="license" class="form-control" placeholder="DL-123456" />
+            </div>
+            <button class="btn btn-primary" style="width:100%;margin-top:8px;" @onclick="HandleUpdate" disabled="@saving">
+                @(saving ? "Saving..." : "Save Changes")
+            </button>
+        </div>
+    </div>
+}
+
+@code {
+    UserReadDto? user;
+    bool loading = true, saving;
+    bool isError;
+    string message = "";
+    string firstName = "", lastName = "", phone = "", license = "";
+
+    protected override async Task OnInitializedAsync()
+    {
+        user = await UserService.GetMeAsync();
+        if (user is not null)
+        {
+            firstName = user.FirstName;
+            lastName = user.LastName;
+            phone = user.PhoneNumber ?? "";
+            license = user.DriverLicenseNumber ?? "";
+        }
+        loading = false;
+    }
+
+    async Task HandleUpdate()
+    {
+        if (string.IsNullOrWhiteSpace(firstName) || string.IsNullOrWhiteSpace(lastName))
+        {
+            isError = true;
+            message = "First name and last name are required.";
+            return;
+        }
+
+        saving = true;
+        message = "";
+
+        var updated = await UserService.UpdateAsync(user!.Id, new UserUpdateRequest(
+            firstName, lastName,
+            string.IsNullOrWhiteSpace(phone) ? null : phone,
+            string.IsNullOrWhiteSpace(license) ? null : license));
+
+        saving = false;
+
+        if (updated is not null)
+        {
+            user = updated;
+            isError = false;
+            message = "Profile updated successfully.";
+        }
+        else
+        {
+            isError = true;
+            message = "Failed to update profile. Please try again.";
+        }
+    }
+}

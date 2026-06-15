@@ -1,0 +1,104 @@
+@page "/"
+@inject IVehicleClientService VehicleService
+@inject IReservationClientService ReservationService
+@inject NavigationManager Nav
+@attribute [Authorize]
+
+<div class="page-header">
+    <h1 class="page-title">Dashboard</h1>
+    <p class="page-subtitle">Welcome back — here's what's happening.</p>
+</div>
+
+@if (loading)
+{
+    <div class="loading"><div class="spinner"></div> Loading...</div>
+}
+else
+{
+    <div class="stats-grid">
+        <div class="stat-card"><div class="stat-label">Total Vehicles</div><div class="stat-value stat-blue">@totalVehicles</div></div>
+        <div class="stat-card"><div class="stat-label">Available Now</div><div class="stat-value stat-success">@availableVehicles</div></div>
+        <div class="stat-card"><div class="stat-label">My Reservations</div><div class="stat-value stat-accent">@myReservations</div></div>
+        <div class="stat-card"><div class="stat-label">Active / Confirmed</div><div class="stat-value stat-danger">@activeRentals</div></div>
+    </div>
+
+    <div class="page-header-row" style="margin-bottom:20px;">
+        <h2 style="font-size:20px;font-weight:700;">Featured Vehicles</h2>
+        <a href="/vehicles" class="btn btn-ghost btn-sm">View all →</a>
+    </div>
+    <div class="card-grid">
+        @foreach (var v in featured)
+        {
+            <div class="vehicle-card" @onclick="() => GoToVehicle(v.Id)">
+                @if (!string.IsNullOrEmpty(v.ImageUrl))
+                {
+                    <div class="vehicle-thumb" style="padding:0;overflow:hidden;">
+                        <img src="@v.ImageUrl" alt="@v.Make @v.Model" style="width:100%;height:100%;object-fit:cover;" />
+                    </div>
+                }
+                else
+                {
+                    <div class="vehicle-thumb">@Emoji(v.Category)</div>
+                }
+                <div class="vehicle-info">
+                    <div class="vehicle-make">@v.Make</div>
+                    <div class="vehicle-model">@v.Model (@v.Year)</div>
+                    <div class="vehicle-badges">
+                        <span class="badge category">@v.Category</span>
+                        <span class="badge">@v.FuelType</span>
+                        <span class="badge @(v.IsAvailable ? "available" : "unavailable")">@(v.IsAvailable ? "✓ Available" : "✗ Booked")</span>
+                    </div>
+                    <div style="display:flex;gap:16px;margin:8px 0;font-size:12px;color:var(--text-muted);">
+                        <span>🪑 @v.Seats seats</span>
+                        <span>⚙️ @v.Transmission</span>
+                    </div>
+                    <div class="vehicle-rate"><span class="rate-amount">€@v.DailyRate</span><span class="rate-unit">/ day</span></div>
+                </div>
+            </div>
+        }
+    </div>
+}
+
+@code {
+    bool loading = true;
+    int totalVehicles, availableVehicles, myReservations, activeRentals;
+    List<VehicleReadDto> featured = new();
+
+    protected override async Task OnInitializedAsync()
+    {
+        var vTask = VehicleService.GetAllAsync();
+        var rTask = ReservationService.GetMyReservationsAsync();
+
+        await Task.WhenAll(vTask, rTask);
+
+        var vehicles = vTask.Result;
+        var reservations = rTask.Result;
+
+        totalVehicles = vehicles.Count;
+        availableVehicles = vehicles.Count(v => v.IsAvailable);
+        myReservations = reservations.Count;
+        activeRentals = reservations.Count(r => r.Status is "Active" or "Confirmed");
+
+        featured = vehicles.Take(6).ToList();
+        loading = false;
+    }
+
+    // 👇 ADD THIS METHOD HERE
+    void GoToVehicle(int id)
+    {
+        Nav.NavigateTo($"/vehicles/{id}");
+    }
+
+    static string Emoji(string c) => c switch
+    {
+        "SUV" => "🚙",
+        "Luxury" => "🏎",
+        "Van" => "🚐",
+        "Truck" => "🚛",
+        "Convertible" => "🚘",
+        "Sports" => "🏎",
+        "Pickup" => "🛻",
+        "Minivan" => "🚌",
+        _ => "🚗"
+    };
+}

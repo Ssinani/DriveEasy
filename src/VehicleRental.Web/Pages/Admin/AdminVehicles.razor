@@ -1,0 +1,210 @@
+@page "/admin/vehicles"
+@inject IVehicleClientService VehicleService
+@attribute [Authorize(Roles = "Admin")]
+
+<div class="page-header-row">
+    <div class="page-header"><h1 class="page-title">Manage Vehicles</h1><p class="page-subtitle">Add, edit, or remove vehicles from the fleet.</p></div>
+    <button class="btn btn-accent" @onclick="OpenCreate">+ Add Vehicle</button>
+</div>
+
+@if (!string.IsNullOrEmpty(message)) { <div class="alert @(isError ? "alert-error" : "alert-success")">@message</div> }
+
+@if (loading) { <div class="loading"><div class="spinner"></div></div> }
+else
+{
+    <div class="table-wrap">
+        <table>
+            <thead><tr><th>ID</th><th>Vehicle</th><th>Plate</th><th>Category</th><th>Rate</th><th>Fuel</th><th>Trans.</th><th>Seats</th><th>Status</th><th>Actions</th></tr></thead>
+            <tbody>
+                @foreach (var v in vehicles)
+                {
+                    <tr>
+                        <td style="color:var(--text-muted);">#@v.Id</td>
+                        <td>
+                            <div style="font-weight:600;">@v.Make @v.Model</div>
+                            <div style="font-size:12px;color:var(--text-muted);">@v.Year · @v.Mileage.ToString("N0") km</div>
+                        </td>
+                        <td>@v.LicensePlate</td>
+                        <td><span class="badge category">@v.Category</span></td>
+                        <td style="font-weight:600;color:var(--accent);">€@v.DailyRate</td>
+                        <td>@v.FuelType</td>
+                        <td>@v.Transmission</td>
+                        <td>@v.Seats</td>
+                        <td><span class="badge @(v.IsAvailable ? "available" : "unavailable")">@(v.IsAvailable ? "Available" : "Unavailable")</span></td>
+                        <td style="display:flex;gap:6px;">
+                            <button class="btn btn-ghost btn-sm" @onclick="() => OpenEdit(v)">Edit</button>
+                            <button class="btn btn-danger btn-sm" @onclick='() => ShowDeleteConfirm(v.Id, $"{v.Make} {v.Model}")'>Delete</button>
+                        </td>
+                    </tr>
+                }
+            </tbody>
+        </table>
+    </div>
+}
+
+@if (showDeleteConfirm)
+{
+    <div class="modal-overlay">
+        <div class="modal">
+            <div class="modal-header">
+                <span class="modal-title">Delete Vehicle</span>
+                <button class="modal-close" @onclick="() => showDeleteConfirm = false">✕</button>
+            </div>
+            <p style="color:var(--text-muted);margin-bottom:20px;">
+                Are you sure you want to delete <strong>@deleteVehicleName</strong>? This cannot be undone.<br/>
+                <span style="font-size:12px;">Vehicles with existing reservations cannot be deleted.</span>
+            </p>
+            <div class="modal-actions">
+                <button class="btn btn-ghost" @onclick="() => showDeleteConfirm = false">Cancel</button>
+                <button class="btn btn-danger" @onclick="ConfirmDelete">Delete</button>
+            </div>
+        </div>
+    </div>
+}
+
+@if (showModal)
+{
+    <div class="modal-overlay" @onclick="CloseModal">
+        <div class="modal" style="max-width:640px;max-height:90vh;overflow-y:auto;" @onclick:stopPropagation="true">
+            <div class="modal-header">
+                <span class="modal-title">@(editId == 0 ? "Add Vehicle" : "Edit Vehicle")</span>
+                <button class="modal-close" @onclick="CloseModal">✕</button>
+            </div>
+
+            <div style="font-size:11px;text-transform:uppercase;font-weight:600;color:var(--text-muted);margin:0 0 10px;letter-spacing:.5px;">Basic Info</div>
+            <div class="form-row">
+                <div class="form-group"><label class="form-label">Make</label><input @bind="fMake" class="form-control" placeholder="e.g. Toyota" /></div>
+                <div class="form-group"><label class="form-label">Model</label><input @bind="fModel" class="form-control" placeholder="e.g. Camry" /></div>
+            </div>
+            <div class="form-row">
+                <div class="form-group"><label class="form-label">Year</label><input @bind="fYear" type="number" class="form-control" /></div>
+                <div class="form-group"><label class="form-label">License Plate</label><input @bind="fPlate" class="form-control" placeholder="e.g. SK-1234-AB" /></div>
+            </div>
+
+            <div style="font-size:11px;text-transform:uppercase;font-weight:600;color:var(--text-muted);margin:16px 0 10px;letter-spacing:.5px;">Classification</div>
+            <div class="form-row">
+                <div class="form-group">
+                    <label class="form-label">Category</label>
+                    <select @bind="fCategory" class="form-control">
+                        <option>Economy</option>
+                        <option>Compact</option>
+                        <option>Sedan</option>
+                        <option>SUV</option>
+                        <option>Minivan</option>
+                        <option>Van</option>
+                        <option>Convertible</option>
+                        <option>Sports</option>
+                        <option>Luxury</option>
+                        <option>Pickup</option>
+                        <option>Truck</option>
+                    </select>
+                </div>
+                <div class="form-group"><label class="form-label">Daily Rate (€)</label><input @bind="fRate" type="number" step="0.01" class="form-control" /></div>
+            </div>
+            <div class="form-row">
+                <div class="form-group">
+                    <label class="form-label">Fuel Type</label>
+                    <select @bind="fFuel" class="form-control">
+                        <option>Gasoline</option>
+                        <option>Diesel</option>
+                        <option>Electric</option>
+                        <option>Hybrid</option>
+                        <option>Plug-in Hybrid</option>
+                        <option>LPG</option>
+                    </select>
+                </div>
+                <div class="form-group">
+                    <label class="form-label">Transmission</label>
+                    <select @bind="fTrans" class="form-control">
+                        <option>Automatic</option>
+                        <option>Manual</option>
+                        <option>Semi-Automatic</option>
+                    </select>
+                </div>
+            </div>
+            <div class="form-row">
+                <div class="form-group"><label class="form-label">Seats</label><input @bind="fSeats" type="number" min="1" max="20" class="form-control" /></div>
+                <div class="form-group"><label class="form-label">Mileage (km)</label><input @bind="fMileage" type="number" class="form-control" /></div>
+            </div>
+
+            <div style="font-size:11px;text-transform:uppercase;font-weight:600;color:var(--text-muted);margin:16px 0 10px;letter-spacing:.5px;">Details</div>
+            <div class="form-group"><label class="form-label">Description</label><textarea @bind="fDesc" class="form-control" rows="2" placeholder="Optional description shown on the vehicle page..."></textarea></div>
+            <div class="form-group"><label class="form-label">Image URL</label><input @bind="fImage" class="form-control" placeholder="https://... (optional)" /></div>
+
+            @if (editId != 0)
+            {
+                <div class="form-group" style="display:flex;align-items:center;gap:10px;margin-top:4px;">
+                    <input @bind="fAvail" type="checkbox" id="avail" />
+                    <label for="avail" class="form-label" style="margin:0;">Available for rental</label>
+                </div>
+            }
+
+            <div class="modal-actions">
+                <button class="btn btn-ghost" @onclick="CloseModal">Cancel</button>
+                <button class="btn btn-primary" @onclick="Save">@(editId == 0 ? "Add Vehicle" : "Save Changes")</button>
+            </div>
+        </div>
+    </div>
+}
+
+@code {
+    List<VehicleReadDto> vehicles = new();
+    bool loading = true, showModal = false, showDeleteConfirm = false, isError = false;
+    string message = "";
+    int editId, deleteId;
+    string deleteVehicleName = "";
+    string fMake = "", fModel = "", fPlate = "", fCategory = "Economy", fFuel = "Gasoline", fTrans = "Automatic", fDesc = "", fImage = "";
+    int fYear = DateTime.Now.Year, fSeats = 5, fMileage = 0;
+    decimal fRate = 50; bool fAvail = true;
+
+    protected override async Task OnInitializedAsync() { vehicles = await VehicleService.GetAllAsync(); loading = false; }
+
+    void OpenCreate()
+    {
+        editId = 0; fMake = fModel = fPlate = fDesc = fImage = ""; fYear = DateTime.Now.Year;
+        fCategory = "Economy"; fFuel = "Gasoline"; fTrans = "Automatic"; fRate = 50; fSeats = 5; fMileage = 0; fAvail = true;
+        showModal = true;
+    }
+
+    void OpenEdit(VehicleReadDto v)
+    {
+        editId = v.Id; fMake = v.Make; fModel = v.Model; fPlate = v.LicensePlate; fYear = v.Year;
+        fCategory = v.Category; fFuel = v.FuelType; fTrans = v.Transmission; fRate = v.DailyRate;
+        fSeats = v.Seats; fMileage = v.Mileage; fDesc = v.Description ?? ""; fImage = v.ImageUrl ?? ""; fAvail = v.IsAvailable;
+        showModal = true;
+    }
+
+    void CloseModal() => showModal = false;
+
+    async Task Save()
+    {
+        var img = string.IsNullOrWhiteSpace(fImage) ? null : fImage;
+        if (editId == 0)
+        {
+            var r = await VehicleService.CreateAsync(new VehicleCreateDto(fMake, fModel, fYear, fPlate, fCategory, fRate, fDesc, img, fMileage, fFuel, fTrans, fSeats));
+            isError = r is null; message = r is null ? "Failed to add vehicle." : "Vehicle added successfully.";
+        }
+        else
+        {
+            var r = await VehicleService.UpdateAsync(editId, new VehicleUpdateDto(fMake, fModel, fYear, fPlate, fCategory, fRate, fAvail, fDesc, img, fMileage, fFuel, fTrans, fSeats));
+            isError = r is null; message = r is null ? "Failed to update vehicle." : "Vehicle updated successfully.";
+        }
+        showModal = false; vehicles = await VehicleService.GetAllAsync();
+    }
+
+    void ShowDeleteConfirm(int id, string name)
+    {
+        deleteId = id;
+        deleteVehicleName = name;
+        showDeleteConfirm = true;
+    }
+
+    async Task ConfirmDelete()
+    {
+        showDeleteConfirm = false;
+        var ok = await VehicleService.DeleteAsync(deleteId);
+        isError = !ok;
+        message = ok ? $"{deleteVehicleName} deleted successfully." : $"Cannot delete {deleteVehicleName} — it has existing reservations.";
+        if (ok) vehicles = await VehicleService.GetAllAsync();
+    }
+}

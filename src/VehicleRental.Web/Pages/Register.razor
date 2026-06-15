@@ -1,0 +1,40 @@
+@page "/register"
+@layout VehicleRental.Web.Shared.AuthLayout
+@inject IAuthClientService AuthService
+@inject NavigationManager Nav
+
+<div class="auth-card">
+    <div class="auth-logo">🚗</div>
+    <h1 class="auth-title">DriveEasy</h1>
+    <p class="auth-subtitle">Create your account</p>
+    @if (!string.IsNullOrEmpty(error))
+    {
+        <div class="alert alert-error">@error</div>
+    }
+    <div class="form-row">
+        <div class="form-group"><label class="form-label">First Name</label><input @bind="firstName" class="form-control" placeholder="John" /></div>
+        <div class="form-group"><label class="form-label">Last Name</label><input @bind="lastName" class="form-control" placeholder="Doe" /></div>
+    </div>
+    <div class="form-group"><label class="form-label">Email</label><input @bind="email" type="email" class="form-control" placeholder="you@example.com" /></div>
+    <div class="form-group"><label class="form-label">Phone</label><input @bind="phone" class="form-control" placeholder="+389 70 000 000" /></div>
+    <div class="form-group"><label class="form-label">Driver's License</label><input @bind="license" class="form-control" placeholder="DL-123456" /></div>
+    <div class="form-group"><label class="form-label">Password</label><input @bind="password" type="password" class="form-control" placeholder="Min 6 characters" /></div>
+    <button class="btn btn-accent" style="width:100%;margin-top:8px;" @onclick="HandleRegister" disabled="@loading">@(loading ? "Creating..." : "Create Account")</button>
+    <p style="text-align:center;margin-top:20px;color:var(--text-muted);font-size:14px;">Already have an account? <a href="/login">Sign in</a></p>
+</div>
+
+@code {
+    string firstName = "", lastName = "", email = "", phone = "", license = "", password = "", error = "";
+    bool loading;
+
+    async Task HandleRegister()
+    {
+        if (string.IsNullOrWhiteSpace(firstName) || string.IsNullOrWhiteSpace(email) || string.IsNullOrWhiteSpace(password)) { error = "Please fill in all required fields."; return; }
+        if (password.Length < 6) { error = "Password must be at least 6 characters."; return; }
+        loading = true; error = "";
+        var (result, registerError) = await AuthService.RegisterAsync(new RegisterRequestDto(firstName, lastName, email, password, phone, license));
+        loading = false;
+        if (result is null) error = registerError ?? "Registration failed. Please try again.";
+        else Nav.NavigateTo("/login");
+    }
+}

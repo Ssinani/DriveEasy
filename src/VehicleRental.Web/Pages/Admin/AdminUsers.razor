@@ -1,0 +1,168 @@
+@page "/admin/users"
+@inject IUserClientService UserService
+@attribute [Authorize(Roles = "Admin")]
+
+<div class="page-header">
+    <h1 class="page-title">Manage Users</h1>
+    <p class="page-subtitle">View all accounts, change roles, and deactivate users.</p>
+</div>
+
+@if (!string.IsNullOrEmpty(message))
+{
+    <div class="alert @(isError ? "alert-error" : "alert-success")">@message</div>
+}
+
+@if (loading)
+{
+    <div class="loading"><div class="spinner"></div> Loading users...</div>
+}
+else
+{
+    <div style="display:flex;gap:10px;margin-bottom:16px;flex-wrap:wrap;">
+        <select @bind="filterRole" @bind:after="ApplyFilter" class="form-control" style="width:160px;">
+            <option value="">All Roles</option>
+            <option>Admin</option>
+            <option>Customer</option>
+        </select>
+        <select @bind="filterStatus" @bind:after="ApplyFilter" class="form-control" style="width:160px;">
+            <option value="">All Statuses</option>
+            <option value="active">Active</option>
+            <option value="inactive">Inactive</option>
+        </select>
+    </div>
+
+    <p style="color:var(--text-muted);margin-bottom:16px;font-size:14px;">@filtered.Count user(s)</p>
+
+    <div class="table-wrap">
+        <table>
+            <thead>
+                <tr>
+                    <th>ID</th>
+                    <th>Name</th>
+                    <th>Email</th>
+                    <th>Phone</th>
+                    <th>Role</th>
+                    <th>Status</th>
+                    <th>Member Since</th>
+                    <th>Actions</th>
+                </tr>
+            </thead>
+            <tbody>
+                @foreach (var u in filtered)
+                {
+                    <tr>
+                        <td style="color:var(--text-muted);">#@u.Id</td>
+                        <td>
+                            <div style="display:flex;align-items:center;gap:10px;">
+                                <div style="width:32px;height:32px;border-radius:50%;background:var(--accent);display:flex;align-items:center;justify-content:center;font-size:13px;font-weight:700;color:#fff;flex-shrink:0;">
+                                    @u.FirstName.FirstOrDefault()
+                                </div>
+                                <div>
+                                    <div style="font-weight:600;">@u.FullName</div>
+                                    @if (!string.IsNullOrEmpty(u.DriverLicenseNumber))
+                                    {
+                                        <div style="font-size:11px;color:var(--text-muted);">@u.DriverLicenseNumber</div>
+                                    }
+                                </div>
+                            </div>
+                        </td>
+                        <td>@u.Email</td>
+                        <td>@(u.PhoneNumber ?? "—")</td>
+                        <td>
+                            <span class="badge @(u.Role == "Admin" ? "category" : "")">@u.Role</span>
+                        </td>
+                        <td>
+                            <span class="badge @(u.IsActive ? "available" : "unavailable")">
+                                @(u.IsActive ? "Active" : "Inactive")
+                            </span>
+                        </td>
+                        <td style="font-size:13px;color:var(--text-muted);">@u.CreatedAt.ToString("MMM dd, yyyy")</td>
+                        <td>
+                            <div style="display:flex;gap:6px;flex-wrap:wrap;">
+                                @if (u.Role == "Customer")
+                                {
+                                    <button class="btn btn-ghost btn-sm" @onclick='() => ChangeRole(u.Id, "Admin")'>Make Admin</button>
+                                }
+                                else if (u.Role == "Admin" && u.Id != 1)
+                                {
+                                    <button class="btn btn-ghost btn-sm" @onclick='() => ChangeRole(u.Id, "Customer")'>Make Customer</button>
+                                }
+                                @if (u.IsActive && u.Id != 1)
+                                {
+                                    <button class="btn btn-danger btn-sm" @onclick="() => ShowDeactivate(u)">Deactivate</button>
+                                }
+                            </div>
+                        </td>
+                    </tr>
+                }
+            </tbody>
+        </table>
+    </div>
+}
+
+@if (showConfirm && confirmUser is not null)
+{
+    <div class="modal-overlay">
+        <div class="modal">
+            <div class="modal-header">
+                <span class="modal-title">Deactivate Account</span>
+                <button class="modal-close" @onclick="() => showConfirm = false">✕</button>
+            </div>
+            <p style="color:var(--text-muted);margin-bottom:20px;">
+                Are you sure you want to deactivate <strong>@confirmUser.FullName</strong>?
+                They will no longer be able to log in.
+            </p>
+            <div class="modal-actions">
+                <button class="btn btn-ghost" @onclick="() => showConfirm = false">Cancel</button>
+                <button class="btn btn-danger" @onclick="ConfirmDeactivate">Deactivate</button>
+            </div>
+        </div>
+    </div>
+}
+
+@code {
+    List<UserReadDto> all = new(), filtered = new();
+    bool loading = true, showConfirm = false, isError = false;
+    string message = "", filterRole = "", filterStatus = "";
+    UserReadDto? confirmUser;
+
+    protected override async Task OnInitializedAsync()
+    {
+        all = await UserService.GetAllAsync();
+        ApplyFilter();
+        loading = false;
+    }
+
+    void ApplyFilter()
+    {
+        filtered = all
+            .Where(u => string.IsNullOrEmpty(filterRole) || u.Role == filterRole)
+            .Where(u => filterStatus switch
+            {
+                "active" => u.IsActive,
+                "inactive" => !u.IsActive,
+                _ => true
+            })
+            .ToList();
+    }
+
+    async Task ChangeRole(int id, string newRole)
+    {
+        var ok = await UserService.ChangeRoleAsync(id, newRole);
+        isError = !ok;
+        message = ok ? $"Role updated to {newRole}." : "Failed to change role.";
+        if (ok) { all = await UserService.GetAllAsync(); ApplyFilter(); }
+    }
+
+    void ShowDeactivate(UserReadDto u) { confirmUser = u; showConfirm = true; }
+
+    async Task ConfirmDeactivate()
+    {
+        if (confirmUser is null) return;
+        var ok = await UserService.DeactivateAsync(confirmUser.Id);
+        showConfirm = false;
+        isError = !ok;
+        message = ok ? $"{confirmUser.FullName} has been deactivated." : "Failed to deactivate user.";
+        if (ok) { all = await UserService.GetAllAsync(); ApplyFilter(); }
+    }
+}

@@ -1,0 +1,78 @@
+@page "/reservations"
+@inject IReservationClientService ReservationService
+@attribute [Authorize]
+
+<div class="page-header"><h1 class="page-title">My Reservations</h1><p class="page-subtitle">Track and manage your vehicle rentals.</p></div>
+
+@if (!string.IsNullOrEmpty(message)) { <div class="alert @(isError ? "alert-error" : "alert-success")">@message</div> }
+
+@if (loading) { <div class="loading"><div class="spinner"></div> Loading...</div> }
+else if (!reservations.Any())
+{
+    <div class="card" style="text-align:center;padding:60px;">
+        <div style="font-size:48px;margin-bottom:12px;">📅</div>
+        <p style="color:var(--text-muted);margin-bottom:16px;">You have no reservations yet.</p>
+        <a href="/vehicles" class="btn btn-primary">Browse Vehicles</a>
+    </div>
+}
+else
+{
+    <div class="table-wrap">
+        <table>
+            <thead><tr><th>#</th><th>Vehicle</th><th>Dates</th><th>Days</th><th>Total</th><th>Status</th><th>Actions</th></tr></thead>
+            <tbody>
+                @foreach (var r in reservations)
+                {
+                    <tr>
+                        <td style="color:var(--text-muted);">#@r.Id</td>
+                        <td><div style="font-weight:600;">@r.VehicleName</div><div style="font-size:12px;color:var(--text-muted);">@r.LicensePlate</div></td>
+                        <td><div>@r.StartDate.ToString("MMM dd, yyyy")</div><div style="font-size:12px;color:var(--text-muted);">→ @r.EndDate.ToString("MMM dd, yyyy")</div></td>
+                        <td>@r.RentalDays</td>
+                        <td style="font-weight:700;color:var(--accent);">€@r.TotalCost.ToString("F2")</td>
+                        <td><span class="status status-@r.Status">@r.Status</span></td>
+                        <td>
+                            @if (r.Status is "Pending" or "Confirmed")
+                            {
+                                <button class="btn btn-danger btn-sm" @onclick="() => ShowCancel(r.Id)">Cancel</button>
+                            }
+                        </td>
+                    </tr>
+                }
+            </tbody>
+        </table>
+    </div>
+}
+
+@if (showModal)
+{
+    <div class="modal-overlay">
+        <div class="modal">
+            <div class="modal-header"><span class="modal-title">Cancel Reservation</span><button class="modal-close" @onclick="() => showModal = false">✕</button></div>
+            <div class="form-group"><label class="form-label">Reason</label><input @bind="cancelReason" class="form-control" placeholder="Please provide a reason..." /></div>
+            <div class="modal-actions">
+                <button class="btn btn-ghost" @onclick="() => showModal = false">Keep It</button>
+                <button class="btn btn-danger" @onclick="ConfirmCancel">Confirm Cancel</button>
+            </div>
+        </div>
+    </div>
+}
+
+@code {
+    List<ReservationReadDto> reservations = new();
+    bool loading = true, showModal = false, isError = false;
+    string message = "", cancelReason = "";
+    int cancelId;
+
+    protected override async Task OnInitializedAsync() { reservations = await ReservationService.GetMyReservationsAsync(); loading = false; }
+
+    void ShowCancel(int id) { cancelId = id; cancelReason = ""; showModal = true; }
+
+    async Task ConfirmCancel()
+    {
+        if (string.IsNullOrWhiteSpace(cancelReason)) return;
+        var ok = await ReservationService.CancelAsync(cancelId, cancelReason);
+        showModal = false; isError = !ok;
+        message = ok ? "Reservation cancelled successfully." : "Could not cancel reservation.";
+        if (ok) reservations = await ReservationService.GetMyReservationsAsync();
+    }
+}

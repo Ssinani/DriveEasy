@@ -1,0 +1,173 @@
+@page "/vehicles/{Id:int}"
+@inject IVehicleClientService VehicleService
+@inject IReservationClientService ReservationService
+@inject NavigationManager Nav
+@attribute [Authorize]
+
+@if (loading)
+{
+    <div class="loading"><div class="spinner"></div></div>
+}
+else if (vehicle is null)
+{
+
+    <div class="card" style="text-align:center;padding:60px;"><p>Vehicle not found. <a href="/vehicles">← Back</a></p></div>
+}
+else
+{
+    <div style="margin-bottom:16px;"><a href="/vehicles" style="color:var(--text-muted);font-size:14px;">← Back to vehicles</a></div>
+    <div style="display:grid;grid-template-columns:1fr 340px;gap:24px;align-items:start;">
+
+        <div class="card">
+            <!-- Hero image / emoji -->
+            @if (!string.IsNullOrEmpty(vehicle.ImageUrl))
+            {
+                <img src="@vehicle.ImageUrl" alt="@vehicle.Make @vehicle.Model"
+                     style="width:100%;height:220px;object-fit:cover;border-radius:8px;margin-bottom:20px;" />
+            }
+            else
+            {
+                <div style="background:linear-gradient(135deg,var(--navy-light),var(--navy-mid));border-radius:8px;height:200px;display:flex;align-items:center;justify-content:center;font-size:90px;margin-bottom:20px;">@Emoji(vehicle.Category)</div>
+            }
+
+            <div style="font-size:13px;color:var(--text-muted);text-transform:uppercase;letter-spacing:.5px;">@vehicle.Make</div>
+            <h1 style="font-size:26px;font-weight:800;margin-bottom:12px;">@vehicle.Model <span style="color:var(--text-muted);font-weight:400;">(@vehicle.Year)</span></h1>
+
+            <div class="vehicle-badges" style="margin-bottom:20px;">
+                <span class="badge category">@vehicle.Category</span>
+                <span class="badge">@vehicle.FuelType</span>
+                <span class="badge">@vehicle.Transmission</span>
+                <span class="badge">@vehicle.Seats seats</span>
+                <span class="badge @(vehicle.IsAvailable ? "available" : "unavailable")">@(vehicle.IsAvailable ? "✓ Available" : "✗ Unavailable")</span>
+            </div>
+
+            <!-- Specs grid -->
+            <div style="display:grid;grid-template-columns:repeat(3,1fr);gap:12px;margin-bottom:20px;">
+                <div style="background:var(--navy-light);border-radius:8px;padding:14px;text-align:center;">
+                    <div style="font-size:22px;margin-bottom:4px;">⛽</div>
+                    <div style="font-size:11px;color:var(--text-muted);text-transform:uppercase;margin-bottom:2px;">Fuel</div>
+                    <div style="font-size:13px;font-weight:600;">@vehicle.FuelType</div>
+                </div>
+                <div style="background:var(--navy-light);border-radius:8px;padding:14px;text-align:center;">
+                    <div style="font-size:22px;margin-bottom:4px;">⚙️</div>
+                    <div style="font-size:11px;color:var(--text-muted);text-transform:uppercase;margin-bottom:2px;">Transmission</div>
+                    <div style="font-size:13px;font-weight:600;">@vehicle.Transmission</div>
+                </div>
+                <div style="background:var(--navy-light);border-radius:8px;padding:14px;text-align:center;">
+                    <div style="font-size:22px;margin-bottom:4px;">🪑</div>
+                    <div style="font-size:11px;color:var(--text-muted);text-transform:uppercase;margin-bottom:2px;">Seats</div>
+                    <div style="font-size:13px;font-weight:600;">@vehicle.Seats</div>
+                </div>
+                <div style="background:var(--navy-light);border-radius:8px;padding:14px;text-align:center;">
+                    <div style="font-size:22px;margin-bottom:4px;">📍</div>
+                    <div style="font-size:11px;color:var(--text-muted);text-transform:uppercase;margin-bottom:2px;">Mileage</div>
+                    <div style="font-size:13px;font-weight:600;">@vehicle.Mileage.ToString("N0") km</div>
+                </div>
+                <div style="background:var(--navy-light);border-radius:8px;padding:14px;text-align:center;">
+                    <div style="font-size:22px;margin-bottom:4px;">🏷️</div>
+                    <div style="font-size:11px;color:var(--text-muted);text-transform:uppercase;margin-bottom:2px;">Category</div>
+                    <div style="font-size:13px;font-weight:600;">@vehicle.Category</div>
+                </div>
+                <div style="background:var(--navy-light);border-radius:8px;padding:14px;text-align:center;">
+                    <div style="font-size:22px;margin-bottom:4px;">🔖</div>
+                    <div style="font-size:11px;color:var(--text-muted);text-transform:uppercase;margin-bottom:2px;">Plate</div>
+                    <div style="font-size:13px;font-weight:600;">@vehicle.LicensePlate</div>
+                </div>
+            </div>
+
+            @if (!string.IsNullOrEmpty(vehicle.Description))
+            {
+                <div style="border-top:1px solid var(--border);padding-top:16px;">
+                    <div style="font-size:13px;font-weight:600;margin-bottom:8px;">About this vehicle</div>
+                    <p style="color:var(--text-muted);line-height:1.6;margin:0;">@vehicle.Description</p>
+                </div>
+            }
+        </div>
+
+        <!-- Booking panel -->
+        <div class="card" style="position:sticky;top:80px;">
+            <div class="vehicle-rate" style="margin-bottom:20px;"><span class="rate-amount" style="font-size:32px;">€@vehicle.DailyRate</span><span class="rate-unit">/ day</span></div>
+            @if (!string.IsNullOrEmpty(bookingError))
+            {
+                <div class="alert alert-error">@bookingError</div>
+            }
+            @if (!string.IsNullOrEmpty(bookingSuccess))
+            {
+                <div class="alert alert-success">@bookingSuccess</div>
+            }
+            @if (vehicle.IsAvailable)
+            {
+                <div class="form-group"><label class="form-label">Pick-up Date</label><input @bind="startDate" type="date" class="form-control" min="@DateTime.Today.ToString("yyyy-MM-dd")" @oninput="UpdateEstimate" /></div>
+                <div class="form-group"><label class="form-label">Return Date</label><input @bind="endDate" type="date" class="form-control" @oninput="UpdateEstimate" /></div>
+                <div class="form-group"><label class="form-label">Notes (optional)</label><input @bind="notes" class="form-control" placeholder="Any special requests..." /></div>
+                @if (estimate is not null)
+                {
+                    <div style="background:var(--navy-light);border-radius:8px;padding:14px;margin-bottom:16px;">
+                        <div style="display:flex;justify-content:space-between;font-size:13px;margin-bottom:6px;"><span style="color:var(--text-muted);">@estimate.Days day(s) × €@estimate.DailyRate</span><span>€@estimate.Subtotal</span></div>
+                        @if (estimate.DiscountPercent > 0)
+                        {
+                            <div style="display:flex;justify-content:space-between;font-size:13px;margin-bottom:6px;"><span style="color:var(--success);">Discount (@estimate.DiscountPercent%)</span><span style="color:var(--success);">-€@estimate.DiscountAmount.ToString("F2")</span></div>
+                        }
+                        <div style="display:flex;justify-content:space-between;font-size:13px;margin-bottom:8px;"><span style="color:var(--text-muted);">VAT (18%)</span><span>€@estimate.TaxAmount.ToString("F2")</span></div>
+                        <div style="display:flex;justify-content:space-between;font-weight:700;border-top:1px solid var(--border);padding-top:8px;"><span>Total</span><span style="color:var(--accent);font-size:18px;">€@estimate.TotalCost.ToString("F2")</span></div>
+                    </div>
+                }
+                <button class="btn btn-accent" style="width:100%;" @onclick="Book" disabled="@booking">@(booking ? "Booking..." : "Reserve Now")</button>
+            }
+            else
+            {
+
+                <p style="color:var(--text-muted);text-align:center;padding:20px 0;">This vehicle is currently unavailable.</p>
+            }
+        </div>
+    </div>
+}
+
+@code {
+    [Parameter] public int Id { get; set; }
+    VehicleReadDto? vehicle;
+    bool loading = true, booking = false;
+    DateTime startDate = DateTime.Today.AddDays(1), endDate = DateTime.Today.AddDays(2);
+    string notes = "", bookingError = "", bookingSuccess = "";
+    CostEstimateReadDto? estimate;
+
+    protected override async Task OnInitializedAsync()
+    {
+        vehicle = await VehicleService.GetByIdAsync(Id);
+        loading = false;
+        if (vehicle is not null) await UpdateEstimate();
+    }
+
+    async Task UpdateEstimate()
+    {
+        if (startDate >= endDate || vehicle is null) { estimate = null; return; }
+        try { estimate = await ReservationService.EstimateCostAsync(Id, DateTime.SpecifyKind(startDate.Date, DateTimeKind.Utc), DateTime.SpecifyKind(endDate.Date, DateTimeKind.Utc)); } catch { estimate = null; }
+    }
+
+    async Task Book()
+    {
+        bookingError = ""; bookingSuccess = "";
+        if (startDate >= endDate) { bookingError = "Return date must be after pick-up date."; return; }
+        booking = true;
+        var result = await ReservationService.CreateAsync(new ReservationCreateDto(Id,
+            DateTime.SpecifyKind(startDate.Date, DateTimeKind.Utc),
+            DateTime.SpecifyKind(endDate.Date, DateTimeKind.Utc),
+            string.IsNullOrWhiteSpace(notes) ? null : notes));
+        booking = false;
+        if (result is null) bookingError = "Booking failed. Vehicle may already be reserved for these dates.";
+        else bookingSuccess = $"Reservation confirmed! Your booking ID is #{result.Id}.";
+    }
+
+    static string Emoji(string c) => c switch
+    {
+        "SUV" => "🚙",
+        "Luxury" => "🏎",
+        "Van" => "🚐",
+        "Truck" => "🚛",
+        "Convertible" => "🚘",
+        "Sports" => "🏎",
+        "Pickup" => "🛻",
+        "Minivan" => "🚌",
+        _ => "🚗"
+    };
+}

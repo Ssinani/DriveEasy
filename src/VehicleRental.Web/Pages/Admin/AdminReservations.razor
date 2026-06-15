@@ -1,0 +1,174 @@
+@page "/admin/reservations"
+@inject IReservationClientService ReservationService
+@attribute [Authorize(Roles = "Admin")]
+
+<div class="page-header-row">
+    <div class="page-header">
+        <h1 class="page-title">All Reservations</h1>
+        <p class="page-subtitle">Confirm, complete, or cancel customer reservations.</p>
+    </div>
+    <div style="display:flex;gap:10px;align-items:center;">
+        <select @bind="filterStatus" @bind:after="ApplyFilter" class="form-control" style="width:160px;">
+            <option value="">All Statuses</option>
+            <option>Pending</option>
+            <option>Confirmed</option>
+            <option>Active</option>
+            <option>Completed</option>
+            <option>Cancelled</option>
+        </select>
+    </div>
+</div>
+
+@if (!string.IsNullOrEmpty(message))
+{
+    <div class="alert @(isError ? "alert-error" : "alert-success")">@message</div>
+}
+
+@if (loading)
+{
+    <div class="loading"><div class="spinner"></div> Loading reservations...</div>
+}
+else if (!filtered.Any())
+{
+    <div class="card" style="text-align:center;padding:60px;">
+        <div style="font-size:48px;margin-bottom:12px;">📋</div>
+        <p style="color:var(--text-muted);">No reservations found@(string.IsNullOrEmpty(filterStatus) ? "." : $" with status \"{filterStatus}\".")</p>
+    </div>
+}
+else
+{
+    <p style="color:var(--text-muted);margin-bottom:16px;font-size:14px;">@filtered.Count reservation(s)</p>
+    <div class="table-wrap">
+        <table>
+            <thead>
+                <tr>
+                    <th>#</th>
+                    <th>Customer</th>
+                    <th>Vehicle</th>
+                    <th>Dates</th>
+                    <th>Days</th>
+                    <th>Total</th>
+                    <th>Status</th>
+                    <th>Actions</th>
+                </tr>
+            </thead>
+            <tbody>
+                @foreach (var r in filtered)
+                {
+                    <tr>
+                        <td style="color:var(--text-muted);">#@r.Id</td>
+                        <td>
+                            <div style="font-weight:600;">@r.CustomerName</div>
+                            <div style="font-size:12px;color:var(--text-muted);">@r.CustomerEmail</div>
+                        </td>
+                        <td>
+                            <div style="font-weight:600;">@r.VehicleName</div>
+                            <div style="font-size:12px;color:var(--text-muted);">@r.LicensePlate</div>
+                        </td>
+                        <td>
+                            <div>@r.StartDate.ToString("MMM dd, yyyy")</div>
+                            <div style="font-size:12px;color:var(--text-muted);">→ @r.EndDate.ToString("MMM dd, yyyy")</div>
+                        </td>
+                        <td>@r.RentalDays</td>
+                        <td style="font-weight:700;color:var(--accent);">€@r.TotalCost.ToString("F2")</td>
+                        <td><span class="status status-@r.Status">@r.Status</span></td>
+                        <td>
+                            <div style="display:flex;gap:6px;flex-wrap:wrap;">
+                                @if (r.Status == "Pending")
+                                {
+                                    <button class="btn btn-primary btn-sm" @onclick="() => Confirm(r.Id)">Confirm</button>
+                                    <button class="btn btn-danger btn-sm" @onclick="() => ShowCancel(r.Id)">Cancel</button>
+                                }
+                                @if (r.Status is "Confirmed" or "Active")
+                                {
+                                    <button class="btn btn-ghost btn-sm" @onclick="() => Complete(r.Id)">Complete</button>
+                                    @if (r.Status == "Confirmed")
+                                    {
+                                        <button class="btn btn-danger btn-sm" @onclick="() => ShowCancel(r.Id)">Cancel</button>
+                                    }
+                                }
+                            </div>
+                        </td>
+                    </tr>
+                }
+            </tbody>
+        </table>
+    </div>
+}
+
+@* Cancel modal *@
+@if (showModal)
+{
+    <div class="modal-overlay">
+        <div class="modal">
+            <div class="modal-header">
+                <span class="modal-title">Cancel Reservation #@cancelId</span>
+                <button class="modal-close" @onclick="() => showModal = false">✕</button>
+            </div>
+            <div class="form-group">
+                <label class="form-label">Cancellation Reason</label>
+                <input @bind="cancelReason" class="form-control" placeholder="Enter reason for cancellation..." />
+            </div>
+            <div class="modal-actions">
+                <button class="btn btn-ghost" @onclick="() => showModal = false">Go Back</button>
+                <button class="btn btn-danger" @onclick="ConfirmCancel" disabled="@string.IsNullOrWhiteSpace(cancelReason)">Cancel Reservation</button>
+            </div>
+        </div>
+    </div>
+}
+
+@code {
+    List<ReservationReadDto> all = new();
+    List<ReservationReadDto> filtered = new();
+    bool loading = true, showModal = false, isError = false;
+    string message = "", filterStatus = "", cancelReason = "";
+    int cancelId;
+
+    protected override async Task OnInitializedAsync()
+    {
+        all = await ReservationService.GetAllAsync();
+        filtered = all;
+        loading = false;
+    }
+
+    void ApplyFilter()
+    {
+        filtered = string.IsNullOrEmpty(filterStatus)
+            ? all
+            : all.Where(r => r.Status == filterStatus).ToList();
+    }
+
+    async Task Confirm(int id)
+    {
+        var ok = await ReservationService.ConfirmAsync(id);
+        isError = !ok;
+        message = ok ? $"Reservation #{id} confirmed." : "Failed to confirm reservation.";
+        if (ok) await Reload();
+    }
+
+    async Task Complete(int id)
+    {
+        var ok = await ReservationService.CompleteAsync(id);
+        isError = !ok;
+        message = ok ? $"Reservation #{id} marked as completed." : "Failed to complete reservation.";
+        if (ok) await Reload();
+    }
+
+    void ShowCancel(int id) { cancelId = id; cancelReason = ""; showModal = true; }
+
+    async Task ConfirmCancel()
+    {
+        if (string.IsNullOrWhiteSpace(cancelReason)) return;
+        var ok = await ReservationService.CancelAsync(cancelId, cancelReason);
+        showModal = false;
+        isError = !ok;
+        message = ok ? $"Reservation #{cancelId} cancelled." : "Failed to cancel reservation.";
+        if (ok) await Reload();
+    }
+
+    async Task Reload()
+    {
+        all = await ReservationService.GetAllAsync();
+        ApplyFilter();
+    }
+}

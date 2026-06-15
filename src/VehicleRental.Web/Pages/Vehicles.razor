@@ -1,0 +1,152 @@
+@page "/vehicles"
+@inject IVehicleClientService VehicleService
+@inject NavigationManager Nav
+
+<div class="page-header-row">
+    <div class="page-header"><h1 class="page-title">Browse Vehicles</h1><p class="page-subtitle">Find the perfect vehicle for your journey.</p></div>
+</div>
+
+<div class="card" style="margin-bottom:24px;">
+    <div style="display:flex;flex-wrap:wrap;gap:14px;align-items:flex-end;">
+        <div class="form-group" style="margin:0;flex:1;min-width:130px;">
+            <label class="form-label">Category</label>
+            <select @bind="filterCategory" class="form-control">
+                <option value="">All Categories</option>
+                <option>Economy</option>
+                <option>Compact</option>
+                <option>Sedan</option>
+                <option>SUV</option>
+                <option>Minivan</option>
+                <option>Van</option>
+                <option>Convertible</option>
+                <option>Sports</option>
+                <option>Luxury</option>
+                <option>Pickup</option>
+                <option>Truck</option>
+            </select>
+        </div>
+        <div class="form-group" style="margin:0;flex:1;min-width:120px;">
+            <label class="form-label">Fuel Type</label>
+            <select @bind="filterFuel" class="form-control">
+                <option value="">Any Fuel</option>
+                <option>Gasoline</option>
+                <option>Diesel</option>
+                <option>Electric</option>
+                <option>Hybrid</option>
+                <option>Plug-in Hybrid</option>
+                <option>LPG</option>
+            </select>
+        </div>
+        <div class="form-group" style="margin:0;flex:1;min-width:120px;">
+            <label class="form-label">Transmission</label>
+            <select @bind="filterTrans" class="form-control">
+                <option value="">Any</option>
+                <option>Automatic</option>
+                <option>Manual</option>
+                <option>Semi-Automatic</option>
+            </select>
+        </div>
+        <div class="form-group" style="margin:0;flex:1;min-width:100px;">
+            <label class="form-label">Min Rate (€)</label>
+            <input @bind="filterMinRate" type="number" class="form-control" placeholder="0" />
+        </div>
+        <div class="form-group" style="margin:0;flex:1;min-width:100px;">
+            <label class="form-label">Max Rate (€)</label>
+            <input @bind="filterMaxRate" type="number" class="form-control" placeholder="Any" />
+        </div>
+        <div style="display:flex;gap:8px;">
+            <button class="btn btn-primary" @onclick="Search">Search</button>
+            <button class="btn btn-ghost" @onclick="Reset">Reset</button>
+        </div>
+    </div>
+</div>
+
+@if (loading)
+{
+    <div class="loading"><div class="spinner"></div> Loading vehicles...</div>
+}
+else if (!vehicles.Any())
+{
+    <div class="card" style="text-align:center;padding:60px;">
+        <div style="font-size:48px;margin-bottom:12px;">🔍</div>
+        <p style="color:var(--text-muted);">No vehicles match your criteria.</p>
+        <button class="btn btn-ghost" style="margin-top:12px;" @onclick="Reset">Clear filters</button>
+    </div>
+}
+else
+{
+    <p style="color:var(--text-muted);margin-bottom:16px;font-size:14px;">@vehicles.Count vehicle(s) found</p>
+    <div class="card-grid">
+        @foreach (var v in vehicles)
+        {
+            <div class="vehicle-card" @onclick="() => GoToVehicle(v.Id)">
+                @if (!string.IsNullOrEmpty(v.ImageUrl))
+                {
+                    <div class="vehicle-thumb" style="padding:0;overflow:hidden;">
+                        <img src="@v.ImageUrl" alt="@v.Make @v.Model" style="width:100%;height:100%;object-fit:cover;" />
+                    </div>
+                }
+                else
+                {
+                    <div class="vehicle-thumb">@Emoji(v.Category)</div>
+                }
+                <div class="vehicle-info">
+                    <div class="vehicle-make">@v.Make</div>
+                    <div class="vehicle-model">@v.Model (@v.Year)</div>
+                    <div class="vehicle-badges">
+                        <span class="badge category">@v.Category</span>
+                        <span class="badge">@v.FuelType</span>
+                        <span class="badge">@v.Transmission</span>
+                        <span class="badge @(v.IsAvailable ? "available" : "unavailable")">@(v.IsAvailable ? "✓ Available" : "✗ Unavailable")</span>
+                    </div>
+                    <div style="display:flex;gap:16px;margin:8px 0;font-size:12px;color:var(--text-muted);">
+                        <span>🪑 @v.Seats seats</span>
+                        <span>📍 @v.Mileage.ToString("N0") km</span>
+                    </div>
+                    <div class="vehicle-rate"><span class="rate-amount">€@v.DailyRate</span><span class="rate-unit">/ day</span></div>
+                </div>
+            </div>
+        }
+    </div>
+}
+
+@code {
+    List<VehicleReadDto> vehicles = new();
+    bool loading = true;
+    string filterCategory = "", filterFuel = "", filterTrans = "";
+    decimal? filterMinRate, filterMaxRate;
+
+    void GoToVehicle(int id) => Nav.NavigateTo($"/vehicles/{id}");
+
+    protected override async Task OnInitializedAsync() { vehicles = await VehicleService.GetAllAsync(); loading = false; }
+
+    async Task Search()
+    {
+        loading = true;
+        vehicles = await VehicleService.SearchAsync(
+            string.IsNullOrEmpty(filterCategory) ? null : filterCategory,
+            filterMinRate, filterMaxRate,
+            string.IsNullOrEmpty(filterFuel) ? null : filterFuel,
+            string.IsNullOrEmpty(filterTrans) ? null : filterTrans);
+        loading = false;
+    }
+
+    async Task Reset()
+    {
+        filterCategory = ""; filterFuel = ""; filterTrans = ""; filterMinRate = null; filterMaxRate = null;
+        loading = true; vehicles = await VehicleService.GetAllAsync(); loading = false;
+    }
+
+    static string Emoji(string c) => c switch
+    {
+        "SUV" => "🚙",
+        "Luxury" => "🏎",
+        "Van" => "🚐",
+        "Truck" => "🚛",
+        "Convertible" => "🚘",
+        "Sports" => "🏎",
+        "Pickup" => "🛻",
+        "Minivan" => "🚌",
+        _ => "🚗"
+    };
+}

@@ -1,0 +1,36 @@
+@page "/login"
+@layout VehicleRental.Web.Shared.AuthLayout
+@inject IAuthClientService AuthService
+@inject NavigationManager Nav
+
+<div class="auth-card">
+    <div class="auth-logo">🚗</div>
+    <h1 class="auth-title">DriveEasy</h1>
+    <p class="auth-subtitle">Sign in to your account</p>
+    @if (!string.IsNullOrEmpty(error))
+    {
+        <div class="alert alert-error">@error</div>
+    }
+    <div class="form-group"><label class="form-label">Email</label><input @bind="email" type="email" class="form-control" placeholder="you@example.com" /></div>
+    <div class="form-group"><label class="form-label">Password</label><input @bind="password" type="password" class="form-control" placeholder="••••••••" @onkeydown="OnKeyDown" /></div>
+    <button class="btn btn-primary" style="width:100%;margin-top:8px;" @onclick="HandleLogin" disabled="@loading">@(loading ? "Signing in..." : "Sign In")</button>
+    <p style="text-align:center;margin-top:20px;color:var(--text-muted);font-size:14px;">No account? <a href="/register">Register</a></p>
+    <div class="auth-hint"><strong>Demo:</strong> admin@vehiclerental.com / Admin@123</div>
+</div>
+
+@code {
+    string email = "", password = "", error = "";
+    bool loading;
+
+    async Task HandleLogin()
+    {
+        if (string.IsNullOrWhiteSpace(email) || string.IsNullOrWhiteSpace(password)) { error = "Please fill in all fields."; return; }
+        loading = true; error = "";
+        var (result, loginError) = await AuthService.LoginAsync(new LoginRequestDto(email, password));
+        loading = false;
+        if (result is null) error = loginError ?? "Login failed. Please try again.";
+        else Nav.NavigateTo("/", forceLoad: true);
+    }
+
+    async Task OnKeyDown(KeyboardEventArgs e) { if (e.Key == "Enter") await HandleLogin(); }
+}

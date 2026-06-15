@@ -1,0 +1,77 @@
+@inherits LayoutComponentBase
+@inject IAuthClientService AuthService
+@inject NavigationManager Nav
+
+<div class="app-shell">
+    <aside class="sidebar @(sidebarOpen ? "open" : "")">
+        <div class="sidebar-brand">
+            <div class="brand-icon">🚗</div>
+            <span class="brand-name">DriveEasy</span>
+        </div>
+        <nav class="sidebar-nav">
+            <a href="/" class="nav-item" @onclick="CloseSidebar"><span class="nav-icon">⊞</span> Dashboard</a>
+            <a href="/vehicles" class="nav-item" @onclick="CloseSidebar"><span class="nav-icon">🚙</span> Vehicles</a>
+            <AuthorizeView>
+                <Authorized>
+                    <a href="/reservations" class="nav-item" @onclick="CloseSidebar"><span class="nav-icon">📅</span> My Reservations</a>
+                    <a href="/profile" class="nav-item" @onclick="CloseSidebar"><span class="nav-icon">👤</span> My Profile</a>
+                    <AuthorizeView Roles="Admin">
+                        <Authorized Context="auth">
+                            <div class="nav-section-label">Admin</div>
+                            <a href="/admin/vehicles" class="nav-item" @onclick="CloseSidebar"><span class="nav-icon">⚙</span> Manage Vehicles</a>
+                            <a href="/admin/reservations" class="nav-item" @onclick="CloseSidebar"><span class="nav-icon">📋</span> All Reservations</a>
+                            <a href="/admin/users" class="nav-item" @onclick="CloseSidebar"><span class="nav-icon">👥</span> Manage Users</a>
+                        </Authorized>
+                    </AuthorizeView>
+                </Authorized>
+            </AuthorizeView>
+        </nav>
+        <div class="sidebar-footer">
+            <AuthorizeView>
+                <Authorized>
+                    <div class="user-chip">
+                        <div class="user-avatar">@(context.User.Identity?.Name?.FirstOrDefault().ToString().ToUpper() ?? "?")</div>
+                        <span class="user-name">@(context.User.Identity?.Name ?? "User")</span>
+                    </div>
+                    <button class="btn-logout" @onclick="Logout">Sign out</button>
+                </Authorized>
+                <NotAuthorized>
+                    <a href="/login" class="btn-login">Sign in</a>
+                </NotAuthorized>
+            </AuthorizeView>
+        </div>
+    </aside>
+
+    <div class="main-area">
+        <header class="topbar">
+            <button class="menu-toggle" @onclick="ToggleSidebar">☰</button>
+            <div class="topbar-brand">🚗 DriveEasy</div>
+            <div class="topbar-actions">
+                <AuthorizeView>
+                    <NotAuthorized>
+                        <a href="/login" class="topbar-btn">Sign in</a>
+                        <a href="/register" class="topbar-btn primary">Register</a>
+                    </NotAuthorized>
+                </AuthorizeView>
+            </div>
+        </header>
+        <main class="page-content">@Body</main>
+    </div>
+
+    @if (sidebarOpen)
+    {
+        <div class="sidebar-overlay" @onclick="CloseSidebar"></div>
+    }
+</div>
+
+@code {
+    bool sidebarOpen = false;
+    void ToggleSidebar() => sidebarOpen = !sidebarOpen;
+    void CloseSidebar() => sidebarOpen = false;
+
+    async Task Logout()
+    {
+        await AuthService.LogoutAsync();
+        Nav.NavigateTo("/login");
+    }
+}
