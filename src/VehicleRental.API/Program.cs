@@ -13,7 +13,9 @@ var builder = WebApplication.CreateBuilder(args);
 
 // --- Database ---
 builder.Services.AddDbContext<AppDbContext>(options =>
-    options.UseSqlServer(builder.Configuration.GetConnectionString("DefaultConnection")));
+    options.UseSqlServer(
+        builder.Configuration.GetConnectionString("DefaultConnection"),
+        sql => sql.EnableRetryOnFailure(maxRetryCount: 5, maxRetryDelay: TimeSpan.FromSeconds(10), errorNumbersToAdd: null)));
 
 // --- AutoMapper ---
 builder.Services.AddAutoMapper(typeof(MappingProfile));
@@ -102,17 +104,19 @@ var app = builder.Build();
 // --- Middleware pipeline ---
 app.UseMiddleware<ExceptionMiddleware>();
 
-if (app.Environment.IsDevelopment())
-{
-    app.UseSwagger();
-    app.UseSwaggerUI(c => c.SwaggerEndpoint("/swagger/v1/swagger.json", "Vehicle Rental API v1"));
-}
+app.UseSwagger();
+app.UseSwaggerUI(c => c.SwaggerEndpoint("/swagger/v1/swagger.json", "Vehicle Rental API v1"));
 
 app.UseHttpsRedirection();
 app.UseCors("BlazorPolicy");
 app.UseAuthentication();
 app.UseAuthorization();
 app.MapControllers();
+
+// Serve Blazor WASM static files
+app.UseDefaultFiles();
+app.UseStaticFiles();
+app.MapFallbackToFile("index.html");
 
 // --- Auto-migrate and seed on startup ---
 using var scope = app.Services.CreateScope();

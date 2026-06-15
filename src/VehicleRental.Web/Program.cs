@@ -15,7 +15,7 @@ builder.Services.AddScoped(sp =>
 {
     return new HttpClient
     {
-        BaseAddress = new Uri("https://localhost:56560/")
+        BaseAddress = new Uri("https://driveeasy-app-gacyfdfccvhgdngx.francecentral-01.azurewebsites.net/")
     };
 });
 
