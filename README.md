@@ -1,133 +1,131 @@
 # DriveEasy — Vehicle Rental Management System
-**Course:** Service Oriented Architecture · Southeast European University  
-**Stack:** ASP.NET Core 10 · Blazor WebAssembly · SQL Server · EF Core · JWT · AutoMapper
+
+A full-stack vehicle rental platform built with **ASP.NET Core 10 Web API** and **Blazor WebAssembly**, developed as a final project for the Service Oriented Architecture course at South East European University.
 
 ---
 
-## Project structure
+## Features
+
+### Customer
+- Register / Login with JWT authentication
+- Browse vehicle catalogue with filters (category, fuel type, transmission, price)
+- View vehicle details and get a real-time cost estimate before booking
+- Make, view, and cancel reservations
+- Edit personal profile
+
+### Admin
+- Manage vehicles — full CRUD with 11 categories, 6 fuel types
+- View and manage all reservations (confirm, complete, cancel)
+- Manage user accounts — change roles, deactivate accounts
+
+---
+
+## Tech Stack
+
+| Layer | Technology |
+|---|---|
+| Backend | ASP.NET Core 10 Web API |
+| Frontend | Blazor WebAssembly (.NET 10) |
+| Database | SQL Server + Entity Framework Core 10 |
+| Auth | JWT Bearer Tokens (HS256) |
+| Mapping | AutoMapper 13 |
+| Testing | xUnit 2.9.2 + NSubstitute 5.1 |
+| CI/CD | GitHub Actions |
+| Cloud | Microsoft Azure |
+
+---
+
+## Getting Started
+
+### Prerequisites
+- [.NET 10 SDK](https://dotnet.microsoft.com/download)
+- SQL Server (LocalDB is fine for development)
+- Visual Studio 2022 or VS Code
+
+### Run locally
+
+1. **Clone the repo**
+   ```bash
+   git clone https://github.com/YOUR-USERNAME/YOUR-REPO-NAME.git
+   cd YOUR-REPO-NAME
+   ```
+
+2. **Configure the connection string**
+
+   Edit `src/VehicleRental.API/appsettings.json`:
+   ```json
+   "ConnectionStrings": {
+     "DefaultConnection": "Server=(localdb)\\mssqllocaldb;Database=VehicleRentalDb;Trusted_Connection=True;"
+   }
+   ```
+
+3. **Run the API** (migrations run automatically on startup)
+   ```bash
+   cd src/VehicleRental.API
+   dotnet run
+   ```
+
+4. **Run the frontend** (in a separate terminal)
+   ```bash
+   cd src/VehicleRental.Web
+   dotnet run
+   ```
+
+5. Open your browser at the URL shown in the terminal (e.g. `https://localhost:5173`)
+
+### Default admin account
+```
+Email:    admin@vehiclerental.com
+Password: Admin@123
+```
+
+---
+
+## Project Structure
 
 ```
 VehicleRental/
 ├── src/
-│   ├── VehicleRental.API/          ← REST API
-│   │   ├── Controllers/            ← Auth, Vehicles, Reservations, Users
-│   │   ├── Services/               ← Business logic (interface + impl in same file)
-│   │   ├── Repositories/           ← Data access (interface + impl in same file)
-│   │   ├── Models/                 ← EF Core entities
-│   │   ├── DTOs/Dtos.cs            ← All Data Transfer Objects
-│   │   ├── Data/AppDbContext.cs    ← EF Core + seed data
-│   │   ├── Profiles/               ← AutoMapper mapping profile
-│   │   └── Middleware/             ← Global exception handler
-│   └── VehicleRental.Web/          ← Blazor WebAssembly frontend
-│       ├── Pages/                  ← Login, Register, Dashboard, Vehicles, Reservations
-│       ├── Pages/Admin/            ← AdminVehicles, AdminReservations
-│       ├── Shared/                 ← MainLayout, AuthLayout
-│       └── Services/               ← HTTP client services + JWT auth provider
+│   ├── VehicleRental.API/       ← ASP.NET Core Web API
+│   │   ├── Controllers/
+│   │   ├── Services/
+│   │   ├── Repositories/
+│   │   ├── Models/
+│   │   ├── DTOs/
+│   │   ├── Data/                ← EF Core DbContext + Migrations
+│   │   ├── Middleware/          ← Global exception handler
+│   │   └── Profiles/            ← AutoMapper
+│   └── VehicleRental.Web/       ← Blazor WebAssembly frontend
+│       ├── Pages/
+│       ├── Shared/
+│       └── Services/
 └── tests/
-    └── VehicleRental.Tests/        ← xUnit + NSubstitute
-        ├── Controllers/            ← Auth, Vehicles
-        ├── Services/               ← Vehicle, Reservation
-        └── Repositories/          ← Vehicle (EF InMemory)
+    └── VehicleRental.Tests/     ← xUnit unit tests (91 tests)
 ```
 
 ---
 
-## Getting started
+## Running Tests
 
-### 1. Prerequisites
-- .NET 10 SDK
-- SQL Server / LocalDB
-
-### 2. Run the API
 ```bash
-cd src/VehicleRental.API
-dotnet run
-# Swagger UI → https://localhost:7100/swagger
-```
-
-### 3. Run the frontend
-```bash
-cd src/VehicleRental.Web
-dotnet run
-# → https://localhost:7200
-```
-
-### 4. Run tests
-```bash
+cd tests/VehicleRental.Tests
 dotnet test
 ```
 
----
-
-## Default credentials
-| Role  | Email | Password |
-|-------|-------|----------|
-| Admin | admin@vehiclerental.com | Admin@123 |
+Expected output: **91 passed, 0 failed**
 
 ---
 
-## API endpoints
+## API Documentation
 
-### Auth — `/api/auth`
-| Method | Endpoint | Auth | Description |
-|--------|----------|------|-------------|
-| POST | `/login` | Public | Returns JWT on valid credentials |
-| POST | `/register` | Public | Creates customer account, returns JWT |
-
-### Vehicles — `/api/vehicles`
-| Method | Endpoint | Auth | Description |
-|--------|----------|------|-------------|
-| GET | `/` | Public | All vehicles |
-| GET | `/{id}` | Public | Vehicle by ID |
-| GET | `/available?startDate&endDate` | Public | Availability search |
-| GET | `/search?category&minRate&maxRate&fuelType&transmission` | Public | Multi-filter search |
-| POST | `/` | Admin | Create vehicle |
-| PUT | `/{id}` | Admin | Update vehicle |
-| DELETE | `/{id}` | Admin | Delete vehicle |
-
-### Reservations — `/api/reservations`
-| Method | Endpoint | Auth | Description |
-|--------|----------|------|-------------|
-| GET | `/` | Admin | All reservations |
-| GET | `/my` | Customer | Own reservations |
-| GET | `/{id}` | Owner/Admin | Single reservation |
-| GET | `/status/{status}` | Admin | Filter by status |
-| GET | `/estimate?vehicleId&startDate&endDate` | Auth | Cost estimate with discounts + VAT |
-| POST | `/` | Auth | Create reservation |
-| PUT | `/{id}` | Owner/Admin | Update pending reservation |
-| PATCH | `/{id}/cancel` | Owner/Admin | Cancel reservation |
-| PATCH | `/{id}/confirm` | Admin | Confirm pending reservation |
-| PATCH | `/{id}/complete` | Admin | Mark reservation completed |
-
-### Users — `/api/users`
-| Method | Endpoint | Auth | Description |
-|--------|----------|------|-------------|
-| GET | `/` | Admin | All users |
-| GET | `/me` | Auth | Own profile |
-| GET | `/{id}` | Owner/Admin | User by ID |
-| GET | `/role/{role}` | Admin | Users by role |
-| PUT | `/{id}` | Owner/Admin | Update profile |
-| PATCH | `/{id}/deactivate` | Admin | Soft-delete user |
-| PATCH | `/{id}/role` | Admin | Change user role |
+Swagger UI is available at `/swagger` when running in development mode.
 
 ---
 
-## Business logic highlights
-- **Tiered discounts:** 7+ days = 5%, 14+ days = 10%, 30+ days = 15%
-- **18% VAT** applied after discount
-- **Conflict detection:** no overlapping non-cancelled reservations
-- **Validation rules:** no past start dates · min 1 day · max 90 days
-- **IMemoryCache** with 60s TTL on `GetReservationById`; invalidated on status change
-- **Soft delete** on users (`IsActive = false`)
-- **Role-based access:** Admin vs Customer at both service and controller level
+## Course Info
 
----
-
-## CI/CD
-GitHub Actions pipeline (`.github/workflows/ci-cd.yml`) runs on push to `main` or `develop`:
-1. Build solution
-2. Run all unit tests
-3. Deploy API → Azure App Service
-4. Deploy Blazor → Azure Static Web Apps
-
-**Required GitHub secrets:** `AZURE_WEBAPP_NAME`, `AZURE_WEBAPP_PUBLISH_PROFILE`, `AZURE_STATIC_WEB_APPS_API_TOKEN`
+| | |
+|---|---|
+| Course | Service Oriented Architecture |
+| Institution | South East European University |
+| Academic Year | 2025 / 2026 |
